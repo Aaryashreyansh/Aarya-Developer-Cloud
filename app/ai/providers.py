@@ -25,6 +25,15 @@ def _required_env(name: str) -> str:
     return value
 
 
+def _required_model(requested: str | None, env_name: str) -> str:
+    value = (requested or os.getenv(env_name, "")).strip()
+    if not value:
+        raise ProviderConfigurationError(
+            f"Choose a model and set {env_name} on the server."
+        )
+    return value
+
+
 async def _post_json(
     url: str,
     *,
@@ -57,7 +66,7 @@ async def generate(
 
     if provider == "openai":
         key = _required_env("OPENAI_API_KEY")
-        chosen_model = model or os.getenv("OPENAI_MODEL", "gpt-6")
+        chosen_model = _required_model(model, "OPENAI_MODEL")
         payload: dict[str, Any] = {"model": chosen_model, "input": prompt}
         if system_prompt:
             payload["instructions"] = system_prompt
@@ -79,7 +88,7 @@ async def generate(
 
     if provider == "gemini":
         key = _required_env("GEMINI_API_KEY")
-        chosen_model = model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        chosen_model = _required_model(model, "GEMINI_MODEL")
         contents = [{"role": "user", "parts": [{"text": prompt}]}]
         payload = {"contents": contents}
         if system_prompt:
@@ -100,7 +109,7 @@ async def generate(
 
     if provider == "claude":
         key = _required_env("ANTHROPIC_API_KEY")
-        chosen_model = model or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+        chosen_model = _required_model(model, "ANTHROPIC_MODEL")
         messages = [{"role": "user", "content": prompt}]
         payload = {"model": chosen_model, "max_tokens": 2048, "messages": messages}
         if system_prompt:
@@ -124,9 +133,7 @@ async def generate(
 
     if provider == "openrouter":
         key = _required_env("OPENROUTER_API_KEY")
-        chosen_model = model or os.getenv("OPENROUTER_MODEL", "")
-        if not chosen_model:
-            raise ProviderConfigurationError("Set OPENROUTER_MODEL to a model available to your account.")
+        chosen_model = _required_model(model, "OPENROUTER_MODEL")
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
