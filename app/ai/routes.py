@@ -1,6 +1,8 @@
+import hmac
+import os
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from app.ai.providers import (
@@ -39,7 +41,19 @@ def list_providers() -> dict[str, list[dict[str, str]]]:
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest) -> ChatResponse:
+async def chat(
+    request: ChatRequest,
+    x_api_token: str | None = Header(default=None, alias="X-API-Token"),
+) -> ChatResponse:
+    expected_token = os.getenv("APP_API_TOKEN", "").strip()
+    if not expected_token:
+        raise HTTPException(
+            status_code=503,
+            detail="Backend authentication is not configured. Set APP_API_TOKEN on the server.",
+        )
+    if not x_api_token or not hmac.compare_digest(x_api_token, expected_token):
+        raise HTTPException(status_code=401, detail="Invalid or missing API token.")
+
     try:
         answer = await generate(
             request.provider,
